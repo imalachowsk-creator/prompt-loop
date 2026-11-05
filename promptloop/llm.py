@@ -65,7 +65,20 @@ class MockLLM:
     def chat(self, system: str, user: str) -> str:
         if "PROMPT OPTIMIZER" in system:
             return self._improve(user)
+        if "ANSWER JUDGE" in system:
+            return self._judge(user)
         return self._answer(system, user)
+
+    def _judge(self, user: str) -> str:
+        context = user.split("CONTEXT:")[1].split("QUESTION:")[0]
+        question = user.split("QUESTION:")[1].split("ANSWER:")[0]
+        answer = user.split("ANSWER:")[1]
+        ctx, q, a = self._words(context), self._words(question), self._words(answer)
+        if "know" in a and len(q & ctx) < 2:
+            ok = True                       # correct refusal
+        else:
+            ok = len(a & ctx) >= 5 and len(q & ctx) >= 2
+        return json.dumps({"correct": ok, "grounded": ok, "reason": "word overlap"})
 
     @staticmethod
     def _words(text: str) -> set[str]:

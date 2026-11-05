@@ -77,13 +77,16 @@ ollama pull llama3.2:3b
 # 2. ask the agent
 python -m promptloop ask "How do I keep Polish letters when writing JSON?"
 
-# 3. evaluate the current prompt (-v shows every case)
+# 3. evaluate the current prompt (-v shows every case and why it failed)
 python -m promptloop eval -v
 
-# 4. run the improvement loop
+# 4. run the improvement loop (learns on train, reports held-out test)
 python -m promptloop improve --iterations 3
 
-# 5. see which prompt changes were accepted and why
+# 5. grade the test split with an LLM judge and compare it with the keyword metric
+python -m promptloop eval --split test --judge -v
+
+# 6. see which prompt changes were accepted and why
 python -m promptloop history
 ```
 
@@ -99,12 +102,28 @@ run without Ollama.
 | Agent | `promptloop/agent.py` | Retrieval-augmented answering with source tags |
 | Evaluation | `promptloop/evaluate.py` | Per-case scoring and aggregate metrics |
 | Improvement loop | `promptloop/improve.py` | Learnings → optimizer → gated acceptance → history |
+| LLM judge | `promptloop/judge.py` | Second model grades answers; agreement with keyword metric |
 
-**Evaluation metrics** (`eval/questions.jsonl`, 20 in-scope + 4 out-of-scope questions)
+**Evaluation metrics** (`eval/questions.jsonl`, 30 in-scope + 6 out-of-scope questions)
 - *accuracy* – answer contains the expected function/parameter names
 - *citation rate* – answer cites the correct knowledge-base section
 - *refusal rate* – agent says "I don't know" for questions outside the docs
 - *score* – weighted mean used by the acceptance gate
+
+**Train/test split.** The 36 questions are split 50/50 (both halves contain
+every documentation file and out-of-scope questions). The loop sees failures
+only from *train* and accepts or rejects prompts only on the *train* score. The
+*test* split is scored for every accepted prompt but never shown to the
+optimizer, so the test score shows whether a prompt really generalizes or just
+memorized the training questions. A unit test checks that no test question
+ever reaches the optimizer.
+
+**LLM-as-judge.** `eval --judge` asks a model to grade each answer as
+*correct* and *grounded* in the retrieved documentation (JSON output, with a
+fallback parser for small models that break the format). The report shows how
+often the judge agrees with the keyword metric and lists the disagreements -
+cases where either the metric is too strict or the judge is too lenient, which
+is where a human reviewer should look first.
 
 **Learnings.** Each failure is mapped to a general rule (e.g. "cite the source
 tag"), and human feedback such as support threads or review comments
@@ -119,8 +138,9 @@ a new version file, so changes can be reviewed like code.
 
 ## Limitations and next steps
 
-- Keyword-based scoring is simple; next step is an LLM-as-judge metric and comparing it with the keyword metric.
-- The eval set is small, so a held-out test split is needed to detect overfitting the prompt to the eval set.
+- Use human labels on a sample of answers to measure which grader (keyword metric or LLM judge) is closer to a person.
+- The judge is the same small model as the agent; a stronger or different judge model would reduce self-preference bias.
+- Read feedback directly from GitHub issue and pull-request comments instead of a JSONL file.
 - Add a tool (e.g. running a Python snippet) to turn the QA agent into a multi-step agent.
 - Run several models (Llama, Qwen, Mistral) and compare how much each benefits from the loop.
 

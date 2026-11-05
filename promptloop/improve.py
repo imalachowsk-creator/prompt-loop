@@ -81,10 +81,21 @@ def latest_version(prompts_dir: Path) -> int:
 
 def improve(llm, optimizer_llm, retriever, cases, prompts_dir="prompts", runs_dir="runs",
             feedback_path="feedback/feedback.jsonl", iterations: int = 3,
-            min_gain: float = 0.01, log=print) -> EvalReport:
+            min_gain: float = 0.01, test_cases=None, log=print) -> EvalReport:
+    """Optimize on `cases` (the train split). If `test_cases` are given, they are
+    scored for the baseline and every accepted prompt, but never shown to the
+    optimizer and never used to accept/reject - so the test score is an honest
+    estimate of how well the prompt generalizes."""
     prompts_dir, runs_dir = Path(prompts_dir), Path(runs_dir)
     runs_dir.mkdir(parents=True, exist_ok=True)
     feedback = load_feedback(feedback_path)
+
+    def test_score(p: str, name: str) -> str:
+        if not test_cases:
+            return ""
+        t = run_eval(DocsAgent(llm, retriever, p), test_cases, f"{name} test", progress=True)
+        _save_report(runs_dir, t, suffix="_test")
+        return f"  | held-out test: {t.summary().split(': ', 1)[1]}"
 
     version = latest_version(prompts_dir)
     if version == 0:
@@ -92,6 +103,8 @@ def improve(llm, optimizer_llm, retriever, cases, prompts_dir="prompts", runs_di
     prompt = (prompts_dir / f"v{version}.md").read_text(encoding="utf-8")
     best = run_eval(DocsAgent(llm, retriever, prompt), cases, f"v{version}", progress=True)
     log(f"baseline  {best.summary()}")
+    if test_cases:
+        log(f"          {test_score(prompt, f'v{version}').strip(' |')}")
     _save_report(runs_dir, best)
     rejected: list[tuple[str, float]] = []
 
@@ -127,12 +140,15 @@ def improve(llm, optimizer_llm, retriever, cases, prompts_dir="prompts", runs_di
             cand_report.prompt_version = f"v{version}"
             best = cand_report
             _save_report(runs_dir, best)
+            if test_cases:
+                log(f"          {test_score(prompt, f'v{version}').strip(' |')}")
     log(f"final     {best.summary()}")
     return best
 
 
-def _save_report(runs_dir: Path, report: EvalReport):
-    path = runs_dir / f"eval_{report.prompt_version}.json"
+def _save_report(runs_dir: Path, report: EvalReport, suffix: str = ""):
+    name = report.prompt_version.replace(" test", "")
+    path = runs_dir / f"eval_{name}{suffix}.json"
     path.write_text(json.dumps(report.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
 
 

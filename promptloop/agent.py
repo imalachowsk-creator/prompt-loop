@@ -12,6 +12,7 @@ class AgentAnswer:
     question: str
     answer: str
     retrieved: list[str] = field(default_factory=list)
+    context: str = ""
 
 
 class DocsAgent:
@@ -28,4 +29,5 @@ class DocsAgent:
     def ask(self, question: str) -> AgentAnswer:
         hits = self.retriever.search(question, k=self.top_k)
         reply = self.llm.chat(self.system_prompt, self.build_user_message(question, hits))
-        return AgentAnswer(question, reply, [c.source for c, _ in hits])
+        context = "\n".join(f"[{c.source}] {c.text}" for c, _ in hits)
+        return AgentAnswer(question, reply, [c.source for c, _ in hits], context)

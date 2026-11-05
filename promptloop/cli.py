@@ -18,6 +18,7 @@ from pathlib import Path
 from .agent import DocsAgent
 from .evaluate import load_cases, run_eval
 from .improve import improve, latest_version
+from .judge import agreement_summary, judge_results
 from .llm import LLMError, get_llm
 from .retriever import BM25Retriever
 
@@ -42,11 +43,16 @@ def main(argv=None):
     e.add_argument("--min-score", type=float, default=0.0,
                    help="exit with code 1 if the score is below this (CI gate)")
     e.add_argument("-v", "--verbose", action="store_true")
+    e.add_argument("--split", choices=["train", "test", "all"], default="all")
+    e.add_argument("--judge", action="store_true",
+                   help="also grade answers with an LLM judge and report agreement")
 
     i = sub.add_parser("improve", help="run the improvement loop")
     i.add_argument("--iterations", type=int, default=3)
     i.add_argument("--min-gain", type=float, default=0.01)
     i.add_argument("--feedback", default="feedback/feedback.jsonl")
+    i.add_argument("--no-test", action="store_true",
+                   help="optimize on all cases instead of train, skip held-out test")
 
     sub.add_parser("history", help="show accepted/rejected prompt changes")
 
@@ -68,7 +74,10 @@ def main(argv=None):
         elif args.cmd == "eval":
             name, prompt = load_prompt(args.version)
             agent = DocsAgent(llm, BM25Retriever.from_dir(args.kb), prompt)
-            report = run_eval(agent, load_cases(args.cases), name, progress=True)
+            report = run_eval(agent, load_cases(args.cases, args.split), name, progress=True)
+            judgements = {}
+            if args.judge:
+                judgements = {j.id: j for j in judge_results(llm, report.results)}
             if args.verbose:
                 for r in report.results:
                     mark = "ok  " if not r.failed else "FAIL"
@@ -76,11 +85,17 @@ def main(argv=None):
                         ["no citation"] * (r.answerable and not r.cited)
                         + ["missing keywords"] * (r.answerable and r.keyword_score < 1)
                         + ["should refuse"] * (not r.answerable and not r.refused))
+                    j = judgements.get(r.id)
+                    if j:
+                        why.append(f"judge: {'correct' if j.correct else 'WRONG'}"
+                                   + ("" if j.agrees else " (disagrees)"))
                     flat = " ".join(r.answer.split())
                     print(f"{mark} {r.id} {r.score:.2f}  {r.question}"
                           + (f"   <- {', '.join(why)}" if why else "")
                           + f"\n      -> {flat[:160]}{'...' if len(flat) > 160 else ''}")
             print(report.summary())
+            if judgements:
+                print(agreement_summary(list(judgements.values())))
             if report.score < args.min_score:
                 print(f"score below gate {args.min_score}", file=sys.stderr)
                 return 1
@@ -90,9 +105,13 @@ def main(argv=None):
             # comparable; the optimizer gets some randomness to explore new prompts.
             opt_kwargs = {"temperature": 0.7, **({"model": args.model} if args.model else {})}
             optimizer = get_llm(args.llm, **opt_kwargs)
-            improve(llm, optimizer, BM25Retriever.from_dir(args.kb), load_cases(args.cases),
+            train = load_cases(args.cases, "all" if args.no_test else "train")
+            test = None if args.no_test else load_cases(args.cases, "test")
+            print(f"optimizing on {len(train)} cases"
+                  + (f", held-out test: {len(test)} cases" if test else ""))
+            improve(llm, optimizer, BM25Retriever.from_dir(args.kb), train,
                     prompts_dir=prompts, runs_dir=args.runs, feedback_path=args.feedback,
-                    iterations=args.iterations, min_gain=args.min_gain)
+                    iterations=args.iterations, min_gain=args.min_gain, test_cases=test)
 
         elif args.cmd == "history":
             path = Path(args.runs) / "history.jsonl"

@@ -77,3 +77,45 @@ def test_report_lists_rejected_attempts():
     report = run_eval(DocsAgent(llm, r, "Answer."), load_cases(CASES)[:3])
     text = build_report("Answer.", report, [], rejected=[("Bad prompt", 0.1)])
     assert "REJECTED ATTEMPTS" in text and "Bad prompt" in text
+
+
+def test_split_is_disjoint_and_balanced():
+    train, test = load_cases(CASES, "train"), load_cases(CASES, "test")
+    assert not {c["id"] for c in train} & {c["id"] for c in test}
+    assert len(train) == len(test)
+    assert any(c["source"] is None for c in test)  # out-of-scope questions in test too
+
+
+def test_improve_never_shows_test_cases_to_optimizer(tmp_path):
+    prompts = tmp_path / "prompts"
+    prompts.mkdir()
+    shutil.copy(ROOT / "prompts" / "v1.md", prompts / "v1.md")
+    seen = []
+
+    class SpyOptimizer(MockLLM):
+        def chat(self, system, user):
+            seen.append(user)
+            return super().chat(system, user)
+
+    test = load_cases(CASES, "test")
+    improve(MockLLM(), SpyOptimizer(), BM25Retriever.from_dir(KB), load_cases(CASES, "train"),
+            prompts_dir=prompts, runs_dir=tmp_path / "runs", feedback_path=tmp_path / "none.jsonl",
+            iterations=1, test_cases=test, log=lambda *_: None)
+    assert seen and not any(c["question"] in u for c in test for u in seen)
+
+
+def test_parse_judgement():
+    from promptloop.judge import parse_judgement
+    assert parse_judgement('Sure! {"correct": true, "grounded": false, "reason": "x"}') == (True, False, "x")
+    assert parse_judgement('"correct": true, "grounded": true')[:2] == (True, True)
+    assert parse_judgement("no idea")[:2] == (False, False)
+
+
+def test_judge_agreement():
+    from promptloop.judge import agreement_summary, judge_results
+    llm, r = MockLLM(), BM25Retriever.from_dir(KB)
+    report = run_eval(DocsAgent(llm, r, "Answer. Cite sources. Say I don't know if unsure."),
+                      load_cases(CASES, "test"))
+    js = judge_results(llm, report.results, progress=False)
+    assert len(js) == len(report.results)
+    assert "agreement with keyword metric" in agreement_summary(js)

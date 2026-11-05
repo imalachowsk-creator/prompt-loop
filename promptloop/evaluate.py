@@ -33,15 +33,20 @@ class CaseResult:
     refused: bool
     answerable: bool
     retrieved: list[str]
+    context: str = ""
 
     @property
     def failed(self) -> bool:
         return self.score < 1.0
 
 
-def load_cases(path: str | Path) -> list[dict]:
+def load_cases(path: str | Path, split: str = "all") -> list[dict]:
+    """split: "train", "test" or "all". Cases without a split field count as train."""
     with open(path, encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
+        cases = [json.loads(line) for line in f if line.strip()]
+    if split == "all":
+        return cases
+    return [c for c in cases if c.get("split", "train") == split]
 
 
 def is_refusal(answer: str) -> bool:
@@ -49,7 +54,7 @@ def is_refusal(answer: str) -> bool:
     return any(m in a for m in REFUSAL_MARKERS)
 
 
-def score_case(case: dict, answer: str, retrieved: list[str]) -> CaseResult:
+def score_case(case: dict, answer: str, retrieved: list[str], context: str = "") -> CaseResult:
     refused = is_refusal(answer)
     answerable = case.get("source") is not None
     if answerable:
@@ -65,7 +70,7 @@ def score_case(case: dict, answer: str, retrieved: list[str]) -> CaseResult:
         kw, cited = 1.0, False
         score = 1.0 if refused else 0.0
     return CaseResult(case["id"], case["question"], answer, round(score, 3),
-                      round(kw, 3), cited, refused, answerable, retrieved)
+                      round(kw, 3), cited, refused, answerable, retrieved, context)
 
 
 @dataclass
@@ -98,7 +103,7 @@ def run_eval(agent, cases: list[dict], prompt_version: str = "?",
             print(f"\r  evaluating {prompt_version} [{n}/{len(cases)}]", end="",
                   file=sys.stderr, flush=True)
         out = agent.ask(case["question"])
-        results.append(score_case(case, out.answer, out.retrieved))
+        results.append(score_case(case, out.answer, out.retrieved, out.context))
     if progress:
         print("\r" + " " * 40 + "\r", end="", file=sys.stderr, flush=True)
     ans = [r for r in results if r.answerable]

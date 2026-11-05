@@ -13,6 +13,11 @@ jobs:
       - run: pip install pytest
       - name: Unit tests
         run: pytest -q
-      - name: Eval gate (mock model) - prompt changes must not drop the score
+      - name: Eval gate on held-out test split (mock model)
         run: |
-          python -m promptloop --llm mock eval --min-score 0.5
+          python -m promptloop --llm mock eval --split test --min-score 0.4
+      - name: Improvement loop smoke test (mock model)
+        run: |
+          mkdir -p /tmp/p && cp prompts/v1.md /tmp/p/
+          python -m promptloop --llm mock --prompts /tmp/p --runs /tmp/r improve --iterations 2
+          
