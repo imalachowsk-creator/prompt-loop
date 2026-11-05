@@ -1,0 +1,3 @@
+{"source": "support-thread", "note": "User could not tell where the answer came from. Answers should point to the documentation section."}
+{"source": "review-comment", "note": "Agent invented a PyTorch answer that is not in our docs. It must not answer outside the documentation."}
+{"source": "outcome", "note": "Short answers with the exact function name were rated most helpful."}

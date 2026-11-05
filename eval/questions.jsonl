@@ -1,0 +1,24 @@
+{"id": "q01", "question": "How do I join two parts of a path with pathlib?", "must_include": ["/"], "source": "pathlib"}
+{"id": "q02", "question": "How can I read a whole text file into a string with pathlib?", "must_include": ["read_text"], "source": "pathlib"}
+{"id": "q03", "question": "How do I create a directory together with missing parent directories?", "must_include": ["parents=True"], "source": "pathlib"}
+{"id": "q04", "question": "Which Path attribute gives the file name without the extension?", "must_include": ["stem"], "source": "pathlib"}
+{"id": "q05", "question": "How do I search for csv files recursively in all subdirectories?", "must_include": ["rglob"], "source": "pathlib"}
+{"id": "q06", "question": "How do I turn a JSON string into a Python dict?", "must_include": ["loads"], "source": "json"}
+{"id": "q07", "question": "How do I keep Polish letters unescaped when writing JSON?", "must_include": ["ensure_ascii=False"], "source": "json"}
+{"id": "q08", "question": "Why does json.dumps fail on a datetime object and how to fix it?", "must_include": ["default=str"], "source": "json"}
+{"id": "q09", "question": "What exception is raised when parsing invalid JSON?", "must_include": ["JSONDecodeError"], "source": "json"}
+{"id": "q10", "question": "How do I create a virtual environment for my project?", "must_include": ["venv"], "source": "venv-pip"}
+{"id": "q11", "question": "How do I activate a virtual environment on Windows?", "must_include": ["Scripts"], "source": "venv-pip"}
+{"id": "q12", "question": "How do I save the exact versions of installed packages to a file?", "must_include": ["freeze"], "source": "venv-pip"}
+{"id": "q13", "question": "Which block always runs whether or not an exception occurred?", "must_include": ["finally"], "source": "exceptions"}
+{"id": "q14", "question": "How do I keep the original exception as the cause when raising a new one?", "must_include": [" from "], "source": "exceptions"}
+{"id": "q15", "question": "How do I define my own custom exception class?", "must_include": ["Exception"], "source": "exceptions"}
+{"id": "q16", "question": "How do I show a number with two decimal places in an f-string?", "must_include": [".2f"], "source": "strings"}
+{"id": "q17", "question": "Do string methods like replace change the original string?", "must_include": ["immutable|new string"], "source": "strings"}
+{"id": "q18", "question": "How do I parse a date string with a given format into a datetime?", "must_include": ["strptime"], "source": "datetime"}
+{"id": "q19", "question": "How do I move a date one week forward?", "must_include": ["timedelta"], "source": "datetime"}
+{"id": "q20", "question": "How do I get the Europe/Warsaw time zone?", "must_include": ["ZoneInfo"], "source": "datetime"}
+{"id": "u01", "question": "How do I train a neural network in PyTorch?", "must_include": [], "source": null}
+{"id": "u02", "question": "What is the capital of Australia?", "must_include": [], "source": null}
+{"id": "u03", "question": "How do I configure a Kubernetes cluster autoscaler?", "must_include": [], "source": null}
+{"id": "u04", "question": "Which GPU should I buy for gaming?", "must_include": [], "source": null}
