@@ -21,7 +21,31 @@ if the evaluation score goes up**.
 Runs fully locally with [Ollama](https://ollama.com). No paid API, no external
 Python dependencies (standard library only).
 
-## Example run
+## Results (honest measurement with a held-out test split)
+
+`llama3.2:3b` as the agent, `qwen2.5:7b` as the optimizer, starting from the
+weak `prompts/v1.md`. The loop learned on 18 train questions; 18 test questions
+were never shown to it.
+
+| Prompt | Train score | Held-out test score | Refusals (test) | What changed |
+|---|---|---|---|---|
+| v1 | 0.544 | – | 0% | baseline |
+| v2 | 0.728 | – | – | added "cite sources" and "say I don't know" rules |
+| v3 | 0.744 | **0.767** | **100%** | sharper citation rule |
+
+The test score is not lower than the train score, so the prompt generalizes
+instead of memorizing the training questions. Hallucinated answers to
+out-of-scope questions dropped from 100% to 0%. Citations stayed low (7–13%):
+the 3B agent does not reliably follow the citation format, and optimizing for
+refusals pushed it further down - a trade-off between two metrics. Prompt
+versions are in `prompts_split/`.
+
+**Takeaway:** not everything should be fixed in the prompt. The retriever
+already knows which section the context came from, so in a production system
+the code would attach citations and the prompt would focus on what code cannot
+do (answering correctly and refusing when the docs are silent).
+
+## Earlier runs (before the train/test split)
 
 Real run with `llama3.2:3b` on a MacBook Air, starting from a deliberately weak
 prompt (`prompts/v1.md`):
@@ -50,7 +74,8 @@ final     v3:  score=0.938
 
 The optimizer now explores different candidates instead of repeating one, and
 the gate rejects the two that would have made the agent worse.
-**Overall: 0.554 → 0.938** in two runs; every prompt version is in `prompts/`.
+This 0.938 turned out to be **inflated**: it was measured on the same questions
+the loop learned from. The train/test split above gives the honest number.
 
 ## What the first real run taught me
 
@@ -67,6 +92,11 @@ the gate rejects the two that would have made the agent worse.
 - **Citations are the hard part for a 3B model.** Reading failures with
   `eval -v` showed the model mostly skips the source or invents one
   ("Python docs"). The failure reasons are now printed next to each case.
+- **The optimizer never saw hallucinations.** After the split, refusals stayed
+  at 0%. The report showed the optimizer only the first 8 failures, and the
+  out-of-scope questions sit at the end of the eval file. Examples are now
+  picked round-robin across failure types, and a unit test checks it. With
+  that fix (and a bigger optimizer model) refusals went 0% → 100%.
 
 ## Quick start
 

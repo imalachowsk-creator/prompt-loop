@@ -119,3 +119,11 @@ def test_judge_agreement():
     js = judge_results(llm, report.results, progress=False)
     assert len(js) == len(report.results)
     assert "agreement with keyword metric" in agreement_summary(js)
+
+
+def test_report_shows_every_failure_type():
+    from promptloop.improve import build_report
+    llm, r = MockLLM(), BM25Retriever.from_dir(KB)
+    report = run_eval(DocsAgent(llm, r, "Answer."), load_cases(CASES, "train"))
+    text = build_report("Answer.", report, [], max_examples=4)
+    assert "should refuse" in text  # an out-of-scope example is included

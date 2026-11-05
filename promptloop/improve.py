@@ -51,7 +51,18 @@ def build_report(prompt: str, report: EvalReport, feedback: list[dict], max_exam
                  rejected: list[tuple[str, float]] | None = None) -> str:
     failures = report.failures()
     lines = [f"CURRENT PROMPT:\n{prompt}\n", f"FAILURES: {len(failures)} of {len(report.results)} cases"]
-    for r in failures[:max_examples]:
+    # Show examples of EVERY failure type, round-robin, instead of the first N.
+    # Taking the first N hid all out-of-scope failures (they sit at the end of
+    # the eval file), so the optimizer never saw the agent hallucinating.
+    groups: dict[str, list[CaseResult]] = {}
+    for r in failures:
+        groups.setdefault(diagnose(r) or "other", []).append(r)
+    examples: list[CaseResult] = []
+    while len(examples) < max_examples and any(groups.values()):
+        for g in groups.values():
+            if g and len(examples) < max_examples:
+                examples.append(g.pop(0))
+    for r in examples:
         lines.append(f"- Q: {r.question}\n  A: {r.answer[:200]}\n  expected_source: "
                      f"{'out of scope (should refuse)' if not r.answerable else 'see retrieved ' + str(r.retrieved[:1])}")
     rules = sorted({rule for r in failures if (rule := diagnose(r))})

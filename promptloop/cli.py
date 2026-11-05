@@ -51,6 +51,9 @@ def main(argv=None):
     i.add_argument("--iterations", type=int, default=3)
     i.add_argument("--min-gain", type=float, default=0.01)
     i.add_argument("--feedback", default="feedback/feedback.jsonl")
+    i.add_argument("--optimizer-model",
+                   help="model that rewrites the prompt (default: same as --model); "
+                        "a bigger model here usually helps, e.g. qwen2.5:7b")
     i.add_argument("--no-test", action="store_true",
                    help="optimize on all cases instead of train, skip held-out test")
 
@@ -103,7 +106,8 @@ def main(argv=None):
         elif args.cmd == "improve":
             # The agent answers deterministically (temperature 0) so evaluations are
             # comparable; the optimizer gets some randomness to explore new prompts.
-            opt_kwargs = {"temperature": 0.7, **({"model": args.model} if args.model else {})}
+            opt_model = args.optimizer_model or args.model
+            opt_kwargs = {"temperature": 0.7, **({"model": opt_model} if opt_model else {})}
             optimizer = get_llm(args.llm, **opt_kwargs)
             train = load_cases(args.cases, "all" if args.no_test else "train")
             test = None if args.no_test else load_cases(args.cases, "test")
